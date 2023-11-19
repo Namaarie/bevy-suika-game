@@ -1,85 +1,113 @@
 use std::f32::consts::PI;
 
-use bevy::{prelude::*, sprite::{MaterialMesh2dBundle, Mesh2dHandle}, render::camera};
+use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 use bevy_rapier2d::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy::window::PrimaryWindow;
+use rand::Rng;
+
+const SUIKA_TIERS: usize = 12;
+const MAX_SUIKA_SIZE: f32 = 200.;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
+        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.))
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_plugins(WorldInspectorPlugin::new())
         .init_resource::<CurrentSuika>()
-        //.init_resource::<SuikasToBeDeleted>()
-        //.init_resource::<PositionsForNewSuikas>()
         .add_systems(PreStartup, setup)
         .add_systems(Startup, setup_graphics)
         .add_systems(Startup, setup_world)
         .add_systems(Update, (input_handler, move_paddle))
         .add_systems(Update, get_suika_collisions)
-        //.add_systems(Update, delete_suikas)
-        //.add_systems(Update, add_new_suikas)
-        //.add_systems(Update, suika_query)
         //.add_systems(FixedUpdate, rapier_context_query)
         .run();
 }
 
 #[derive(Resource, Default)]
-struct SuikaData {
-    meshes: Vec<Mesh2dHandle>,
-    colors: Vec<Handle<ColorMaterial>>,
-    sizes: Vec<f32>
+struct SuikaData(Vec<Suika>);
+
+struct Suika {
+    size_ratio: f32,
+    suika_sprite: Handle<Image>
 }
 
 #[derive(Resource, Default)]
-struct SuikasToBeDeleted(Vec<Entity>);
-
-#[derive(Resource, Default)]
-struct PositionsForNewSuikas(Vec<Vec2>);
-
-#[derive(Resource, Default)]
-struct CurrentSuika(SuikaTypes);
+struct CurrentSuika(SuikaTier);
 
 #[derive(Default, Clone, Copy, Component, Debug, PartialEq)]
-enum SuikaTypes {
-    #[default]
-    Apple,
-    Orange,
-    Grapefruit
-}
+struct SuikaTier(usize);
 
 #[derive(Component)]
 struct SpawnPaddle;
 
-fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<ColorMaterial>>) {
-    let mut suika_meshes = Vec::new();
-    let mut suika_colors = Vec::new();
-    let mut suika_sizes = Vec::new();
-
-    // APPLES
-    suika_sizes.push(10.);
-    suika_meshes.push(meshes.add(shape::Circle::new(suika_sizes[SuikaTypes::Apple as usize]).into()).into());
-    suika_colors.push(materials.add(ColorMaterial::from(Color::RED))); 
-
-    //ORANGES
-    suika_sizes.push(50.);
-    suika_meshes.push(meshes.add(shape::Circle::new(suika_sizes[SuikaTypes::Orange as usize]).into()).into());
-    suika_colors.push(materials.add(ColorMaterial::from(Color::ORANGE))); 
-
-    //GRAPEFRUITS
-    suika_sizes.push(75.);
-    suika_meshes.push(meshes.add(shape::Circle::new(suika_sizes[SuikaTypes::Grapefruit as usize]).into()).into());
-    suika_colors.push(materials.add(ColorMaterial::from(Color::PINK))); 
-
-    let suika_material = SuikaData {
-        meshes: suika_meshes,
-        colors: suika_colors,
-        sizes: suika_sizes
+fn create_new_suika(
+    asset_server: &Res<AssetServer>,
+    size: f32,
+    tier: SuikaTier
+) -> Suika {
+    let suika = Suika {
+        size_ratio: size,
+        suika_sprite: match tier.0 {
+            0 => asset_server.load("south_korea.png"),
+            1 => asset_server.load("poland.png"),
+            2 => asset_server.load("germany.png"),
+            3 => asset_server.load("japan.png"),
+            4 => asset_server.load("south_africa.png"),
+            5 => asset_server.load("india.png"),
+            6 => asset_server.load("australia.png"),
+            7 => asset_server.load("brazil.png"),
+            8 => asset_server.load("china.png"),
+            9 => asset_server.load("usa.png"),
+            10 => asset_server.load("canada.png"),
+            11 => asset_server.load("russia.png"),
+            _ => {panic!("NOT A VALID TIER")}
+        }
     };
+    return suika;
+}
 
-    commands.insert_resource(suika_material);
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let mut suika_data = SuikaData{0: Vec::<Suika>::new()};
+
+    // Tier0
+    suika_data.0.push(create_new_suika(&asset_server, 0.1, SuikaTier{0: 0}));
+
+    // Tier1
+    suika_data.0.push(create_new_suika(&asset_server,  0.2, SuikaTier{0: 1}));
+
+    // Tier2
+    suika_data.0.push(create_new_suika(&asset_server,  0.3, SuikaTier{0: 2}));
+
+    // Tier3
+    suika_data.0.push(create_new_suika(&asset_server,  0.4, SuikaTier{0: 3}));
+    
+    // Tier4
+    suika_data.0.push(create_new_suika(&asset_server,  0.5, SuikaTier{0: 4}));
+
+    // Tier5
+    suika_data.0.push(create_new_suika(&asset_server,  0.55, SuikaTier{0: 5}));
+
+    // Tier6
+    suika_data.0.push(create_new_suika(&asset_server,  0.6, SuikaTier{0: 6}));
+
+    // Tier7
+    suika_data.0.push(create_new_suika(&asset_server,  0.65, SuikaTier{0: 7}));
+
+    // Tier8
+    suika_data.0.push(create_new_suika(&asset_server,  0.7, SuikaTier{0: 8}));
+
+    // Tier9
+    suika_data.0.push(create_new_suika(&asset_server,  0.8, SuikaTier{0: 9}));
+
+    // Tier10
+    suika_data.0.push(create_new_suika(&asset_server,  0.9, SuikaTier{0: 10}));
+
+    // Tier11
+    suika_data.0.push(create_new_suika(&asset_server,  1.0, SuikaTier{0: 11}));
+
+    commands.insert_resource(suika_data);
 }
 
 fn setup_graphics(mut commands: Commands) {
@@ -133,23 +161,27 @@ fn setup_world(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut mat
         .insert(TransformBundle::from(Transform::from_xyz(0.0, -300.0, 0.0)));
 }
 
-fn spawn_suika(commands: &mut Commands, suika_data: &Res<SuikaData>, suika_type: SuikaTypes, position: Vec2) {
+fn spawn_suika(commands: &mut Commands, suika_data: &Res<SuikaData>, suika_tier: SuikaTier, position: Vec2) {
     let size: f32;
-    let color: Handle<ColorMaterial>;
-    let mesh: Mesh2dHandle;
+    let suika_sprite: Handle<Image>;
 
-    size = suika_data.sizes[suika_type as usize].clone();
-    color = suika_data.colors[suika_type as usize].clone();
-    mesh = suika_data.meshes[suika_type as usize].clone();
+    size = suika_data.0[suika_tier.0].size_ratio.clone() * MAX_SUIKA_SIZE;
+    suika_sprite = suika_data.0[suika_tier.0].suika_sprite.clone();
 
     commands
         .spawn(RigidBody::Dynamic)
         .insert(Collider::ball(size))
-        .insert(Restitution::coefficient(0.7))
-        .insert(GravityScale(5.))
-        .insert(MaterialMesh2dBundle {
-            mesh: mesh,
-            material: color,
+        //.insert(ColliderMassProperties::Mass(size * 100000.))
+        //.insert(ColliderMassProperties::Density(size * 10000.))
+        .insert(Restitution::coefficient(0.))
+        //.insert(GravityScale(500.))
+        .insert(Damping { linear_damping: 0.0, angular_damping: 0.0 })
+        .insert(SpriteBundle {
+            texture: suika_sprite,
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(size * 2.15, size * 2.15)),
+                ..default()
+            },
             ..default()
         })
         .insert(Velocity {
@@ -157,8 +189,8 @@ fn spawn_suika(commands: &mut Commands, suika_data: &Res<SuikaData>, suika_type:
             ..default()
         })
         .insert(TransformBundle::from(Transform::from_xyz(position.x, position.y, 0.0)))
-        .insert(suika_type)
-        .insert(Ccd::enabled())
+        .insert(suika_tier)
+        //.insert(Ccd::enabled())
         .insert(ActiveEvents::COLLISION_EVENTS);
 }
 
@@ -195,7 +227,7 @@ fn input_handler(
         .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
         .map(|ray| ray.origin.truncate())
         {
-            current_suika.0 = get_new_suika(current_suika.0);
+            current_suika.0 = get_new_suika();
             spawn_suika(&mut commands, &suika_data, current_suika.0, Vec2::new(world_position.x, 400.));
             println!("Spawned {:?} at {}", current_suika.0, world_position.x)
         } else {
@@ -204,52 +236,24 @@ fn input_handler(
     }
 }
 
-fn get_new_suika(current_suika: SuikaTypes) -> SuikaTypes{
-    match current_suika {
-        SuikaTypes::Apple => SuikaTypes::Orange,
-        SuikaTypes::Orange => SuikaTypes::Grapefruit,
-        SuikaTypes::Grapefruit => SuikaTypes::Apple,
-    }
+fn get_new_suika() -> SuikaTier{
+    let mut rng = rand::thread_rng();
+    let s = SuikaTier{0: rng.gen_range(0..3)};
+    return s;
 }
 
-fn delete_suikas(mut commands: Commands, mut to_be_deleted: ResMut<SuikasToBeDeleted>) {
-    while !to_be_deleted.0.is_empty() {
-        match to_be_deleted.0.pop() {
-            Some(id) => {
-                commands.entity(id).despawn();
-            },
-            None => {
-                // do nothing if empty
-            },
-        }
-    }
-}
-
-fn add_new_suikas(mut commands: Commands, suika_data: Res<SuikaData>, mut current_suika: ResMut<CurrentSuika>, mut positions: ResMut<PositionsForNewSuikas>) {
-    while !positions.0.is_empty() {
-        match positions.0.pop() {
-            Some(position) => {
-                spawn_suika(&mut commands, &suika_data, current_suika.0, position);
-            },
-            None => {
-                // do nothing if empty
-            },
-        }
-    }
-}
-
-fn get_bigger_suika(current_suika: SuikaTypes) -> SuikaTypes{
-    match current_suika {
-        SuikaTypes::Apple => SuikaTypes::Orange,
-        SuikaTypes::Orange => SuikaTypes::Grapefruit,
-        SuikaTypes::Grapefruit => SuikaTypes::Apple
+fn get_bigger_suika(current_suika: SuikaTier) -> SuikaTier{
+    if current_suika.0 < (SUIKA_TIERS - 1) {
+        return SuikaTier{0: current_suika.0 + 1};
+    } else {
+        return SuikaTier{0: SUIKA_TIERS - 1}
     }
 }
 
 fn get_suika_collisions(
     mut commands: Commands,
     mut collision_events: EventReader<CollisionEvent>,
-    suika_query: Query<&SuikaTypes, &Transform>,
+    suika_query: Query<&SuikaTier, &Transform>,
     suika_data: Res<SuikaData>,
 ) {
     for collision_event in collision_events.read() {
@@ -263,24 +267,10 @@ fn get_suika_collisions(
 
                         commands.entity(*id1).despawn();
                         commands.entity(*id2).despawn();
-
-                        /*
-                        deleted.0.push(*id1);
-                        deleted.0.push(*id2);
-                        if let Ok(transform) = suika_query.get_component::<Transform>(*id1){
-                            new.0.push(Vec2::new(transform.translation.x, transform.translation.y));
-                        }
-                        */
                     }
                 }
             }
         }
-    }
-}
-
-fn suika_query(suika_query: Query<&SuikaTypes>) {
-    for suika in suika_query.iter() {
-        println!("{:?}", suika);
     }
 }
 
