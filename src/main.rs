@@ -471,6 +471,7 @@ fn get_suika_collisions(
     mut scores: ResMut<Scores>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
+    // this is hella sketchy and breaks alot if bad rng
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(id1, id2, flags) = collision_event {
             if *flags == CollisionEventFlags::SENSOR {
